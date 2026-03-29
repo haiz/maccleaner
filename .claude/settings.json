@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(open /tmp/gstack-sketch-1774599157.html)",
+      "Bash(swift build:*)",
+      "Bash(swift run:*)",
+      "Bash(swift test:*)",
+      "Bash(pkill -f MacCleanerApp)",
+      "Bash(sudo du:*)",
+      "Bash(grep -n safetyLevel Sources/MacCleanerCore/Categories/*.swift Sources/MacCleanerCore/Categories/UserDataCategory.swift)",
+      "Bash(while read:*)",
+      "Bash(do du:*)",
+      "Bash(done echo:*)",
+      "Bash(/dev/null du:*)",
+      "Bash(echo '=== Windsurf in /Applications? ===' ls -la /Applications/Windsurf*)",
+      "Bash(echo 'NOT in /Applications' echo echo '=== Windsurf anywhere? ===' find /Applications ~/Applications -name Windsurf* -maxdepth 2)"
+    ],
+    "additionalDirectories": [
+      "/tmp",
+      "/private/tmp",
+      "/Users/haicao/.gstack/projects",
+      "/Users/haicao/code/others/maccleaner"
+    ]
+  }
+}
