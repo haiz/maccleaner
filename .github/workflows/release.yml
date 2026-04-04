@@ -91,6 +91,20 @@ jobs:
 
           rm /tmp/deploy_key
 
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          gh release create "$VERSION" \
+            "MacCleaner-${VERSION}.zip" \
+            --title "MacCleaner $VERSION" \
+            --notes "## Install
+
+\`\`\`bash
+curl -fsSL https://maccleaner.apps.caodev.top/install.sh | bash
+\`\`\`"
+
       - name: Verify deployment
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
