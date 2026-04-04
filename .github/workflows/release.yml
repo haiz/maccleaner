@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build MacCleanerApp
+        run: swift build -c release --product MacCleanerApp
+
+      - name: Create .app bundle
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          BUNDLE_VERSION="${VERSION#v}"
+          mkdir -p MacCleanerApp.app/Contents/MacOS
+
+          cp .build/release/MacCleanerApp MacCleanerApp.app/Contents/MacOS/
+
+          cat > MacCleanerApp.app/Contents/Info.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>MacCleanerApp</string>
+              <key>CFBundleIdentifier</key>
+              <string>top.caodev.maccleaner</string>
+              <key>CFBundleName</key>
+              <string>MacCleaner</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>BUNDLE_VERSION_PLACEHOLDER</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>13.0</string>
+              <key>NSPrincipalClass</key>
+              <string>NSApplication</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          PLIST
+
+          sed -i '' "s/BUNDLE_VERSION_PLACEHOLDER/${BUNDLE_VERSION}/" MacCleanerApp.app/Contents/Info.plist
+
+      - name: Zip .app bundle
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          zip -r "MacCleaner-${VERSION}.zip" MacCleanerApp.app
+
+      - name: Deploy to server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          echo "$SSH_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+          SCP_OPTS="-i /tmp/deploy_key -o StrictHostKeyChecking=no"
+
+          scp $SCP_OPTS \
+            "MacCleaner-${VERSION}.zip" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/maccleaner.apps.caodev.top/releases/"
+
+          ssh $SCP_OPTS "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "echo '${VERSION}' > /var/www/maccleaner.apps.caodev.top/latest.txt"
+
+          rm /tmp/deploy_key
+
+      - name: Verify deployment
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          sleep 3
+          LATEST=$(curl -fsSL https://maccleaner.apps.caodev.top/latest.txt)
+          if [ "$LATEST" != "$VERSION" ]; then
+            echo "Deployment verification failed: latest.txt contains '$LATEST', expected '$VERSION'"
+            exit 1
+          fi
+          echo "Deployed $VERSION successfully"
