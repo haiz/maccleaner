@@ -82,6 +82,10 @@ jobs:
             "MacCleaner-${VERSION}.zip" \
             "${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/maccleaner.apps.caodev.top/releases/"
 
+          scp $SCP_OPTS \
+            install.sh \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:/var/www/maccleaner.apps.caodev.top/install.sh"
+
           ssh $SCP_OPTS "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "echo '${VERSION}' > /var/www/maccleaner.apps.caodev.top/latest.txt"
 
