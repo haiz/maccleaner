@@ -96,14 +96,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
+          cat > /tmp/release_notes.md << 'EOF'
+          ## Install
+
+          ```bash
+          curl -fsSL https://maccleaner.apps.caodev.top/install.sh | bash
+          ```
+          EOF
+
           gh release create "$VERSION" \
             "MacCleaner-${VERSION}.zip" \
             --title "MacCleaner $VERSION" \
-            --notes "## Install
-
-\`\`\`bash
-curl -fsSL https://maccleaner.apps.caodev.top/install.sh | bash
-\`\`\`"
+            --notes-file /tmp/release_notes.md
 
       - name: Verify deployment
         env:
