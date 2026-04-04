@@ -2,7 +2,7 @@
 set -e
 
 BASE_URL="https://maccleaner.apps.caodev.top"
-APP_NAME="MacCleanerApp"
+APP_NAME="MacCleaner"
 INSTALL_DIR="/Applications"
 
 # macOS only
