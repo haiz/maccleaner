@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-BASE_URL="https://maccleaner.apps.caodev.top"
+REPO="haiz/maccleaner"
 APP_NAME="MacCleaner"
 INSTALL_DIR="/Applications"
 
@@ -12,7 +12,7 @@ if [ "$(uname)" != "Darwin" ]; then
 fi
 
 echo "Fetching latest version..."
-VERSION=$(curl -fsSL "$BASE_URL/latest.txt")
+VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$VERSION" ]; then
   echo "Error: Could not determine latest version." >&2
@@ -24,7 +24,7 @@ echo "Installing MacCleaner $VERSION..."
 TMP_DIR=$(mktemp -d)
 ZIP_PATH="$TMP_DIR/MacCleaner.zip"
 
-curl -fsSL "$BASE_URL/releases/MacCleaner-$VERSION.zip" -o "$ZIP_PATH"
+curl -fsSL -L "https://github.com/$REPO/releases/download/$VERSION/MacCleaner-$VERSION.zip" -o "$ZIP_PATH"
 unzip -q "$ZIP_PATH" -d "$TMP_DIR"
 
 if [ -d "$INSTALL_DIR/$APP_NAME.app" ]; then

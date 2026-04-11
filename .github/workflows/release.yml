@@ -102,7 +102,7 @@ jobs:
           ## Install
 
           ```bash
-          curl -fsSL https://maccleaner.apps.caodev.top/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/haiz/maccleaner/main/install.sh | bash
           ```
           EOF
 
