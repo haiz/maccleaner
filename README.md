@@ -2,11 +2,11 @@
 
 A native macOS disk cleanup tool built with Swift and SwiftUI. Scans 27 categories of cleanable files — from Xcode DerivedData to Docker images — and lets you reclaim disk space safely.
 
-![Dashboard](docs/screenshot/Screenshot%202026-04-11%20at%2010.04.51%20AM.png)
+![Dashboard](docs/screenshot/dashboard.png)
 
 The dashboard shows a full breakdown of your disk: an APFS volume chart, a treemap of storage by category, and quick-action buttons for common cleanups.
 
-![Clean All](docs/screenshot/Screenshot%202026-04-11%20at%2010.05.26%20AM.png)
+![Clean All](docs/screenshot/clean-all.png)
 
 The Clean All dialog offers three tiers — **Quick Clean** (caches and build artifacts), **Deep Clean** (+ old versions and dev tools), and **Expert Clean** (+ app data and Docker images) — so you can choose how aggressive the cleanup should be.
 
