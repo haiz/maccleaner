@@ -216,6 +216,9 @@ struct CategoryDetailView: View {
 struct FileRowView: View {
     let item: CleanableItem
     @State private var showInfo = false
+    @State private var isExpanded = false
+    @State private var children: [DirectoryEntry]?
+    @State private var isLoading = false
 
     private var dirInfo: String? {
         DirectoryInfo.description(for: item.path)
@@ -223,84 +226,244 @@ struct FileRowView: View {
             ?? (item.description.count > 20 ? item.description : nil)
     }
 
+    private var canExpand: Bool {
+        SizeCalculator.isExpandableDirectory(item.path)
+    }
+
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "folder.fill")
-                .foregroundStyle(.blue)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                DisclosureChevron(canExpand: canExpand, isExpanded: isExpanded, action: toggleExpand)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text(URL(fileURLWithPath: item.path).lastPathComponent)
-                        .font(.body)
+                Image(systemName: "folder.fill")
+                    .foregroundStyle(.blue)
 
-                    if dirInfo != nil {
-                        Button(action: { showInfo.toggle() }) {
-                            Image(systemName: "info.circle")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .buttonStyle(.plain)
-                        .popover(isPresented: $showInfo, arrowEdge: .trailing) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(URL(fileURLWithPath: item.path).lastPathComponent)
-                                    .font(.headline)
-                                Text(item.path)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(URL(fileURLWithPath: item.path).lastPathComponent)
+                            .font(.body)
+
+                        if dirInfo != nil {
+                            Button(action: { showInfo.toggle() }) {
+                                Image(systemName: "info.circle")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
-                                Divider()
-                                Text(dirInfo ?? "")
-                                    .font(.body)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                    .foregroundStyle(.tertiary)
                             }
-                            .padding(12)
-                            .frame(width: 350)
+                            .buttonStyle(.plain)
+                            .popover(isPresented: $showInfo, arrowEdge: .trailing) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(URL(fileURLWithPath: item.path).lastPathComponent)
+                                        .font(.headline)
+                                    Text(item.path)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .textSelection(.enabled)
+                                    Divider()
+                                    Text(dirInfo ?? "")
+                                        .font(.body)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .padding(12)
+                                .frame(width: 350)
+                            }
                         }
                     }
+
+                    Text(item.path)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
 
-                Text(item.path)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                Spacer()
+
+                // Per-item Reveal in Finder
+                Button(action: {
+                    NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "")
+                }) {
+                    Image(systemName: "folder")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Reveal in Finder")
+
+                if let lastAccessed = item.lastAccessed {
+                    Text(lastAccessed, style: .relative)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(item.formattedSize)
+                    .font(.body.monospacedDigit().bold())
+                    .foregroundStyle(item.sizeBytes > 1_000_000_000 ? .red : .primary)
+            }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+            .onTapGesture { if canExpand { toggleExpand() } }
+            .contextMenu {
+                Button(action: {
+                    NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "")
+                }) {
+                    Label("Reveal in Finder", systemImage: "folder")
+                }
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(item.path, forType: .string)
+                }) {
+                    Label("Copy Path", systemImage: "doc.on.doc")
+                }
+            }
+
+            if isExpanded {
+                SubtreeContent(isLoading: isLoading, children: children, depth: 1)
+            }
+        }
+    }
+
+    private func toggleExpand() {
+        isExpanded.toggle()
+        guard isExpanded, children == nil, !isLoading else { return }
+        isLoading = true
+        Task { @MainActor in
+            let loaded = await SizeCalculator.childEntries(at: item.path)
+            children = loaded
+            isLoading = false
+        }
+    }
+}
+
+// MARK: - Recursive subfolder row
+
+/// A lazily-loaded, recursively-expandable row for a directory child.
+struct DirectoryEntryRow: View {
+    let entry: DirectoryEntry
+    let depth: Int
+
+    @State private var isExpanded = false
+    @State private var children: [DirectoryEntry]?
+    @State private var isLoading = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                DisclosureChevron(canExpand: entry.isDirectory, isExpanded: isExpanded, action: toggleExpand)
+
+                Image(systemName: entry.isDirectory ? "folder" : "doc")
+                    .foregroundStyle(entry.isDirectory ? .blue : .secondary)
+
+                Text(entry.name)
+                    .font(.callout)
                     .lineLimit(1)
                     .truncationMode(.middle)
+
+                Spacer()
+
+                Button(action: {
+                    NSWorkspace.shared.selectFile(entry.path, inFileViewerRootedAtPath: "")
+                }) {
+                    Image(systemName: "folder")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Reveal in Finder")
+
+                Text(entry.formattedSize)
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(entry.sizeBytes > 1_000_000_000 ? .red : .secondary)
+            }
+            .padding(.vertical, 3)
+            .padding(.leading, CGFloat(depth) * 18)
+            .contentShape(Rectangle())
+            .onTapGesture { if entry.isDirectory { toggleExpand() } }
+            .contextMenu {
+                Button(action: {
+                    NSWorkspace.shared.selectFile(entry.path, inFileViewerRootedAtPath: "")
+                }) {
+                    Label("Reveal in Finder", systemImage: "folder")
+                }
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(entry.path, forType: .string)
+                }) {
+                    Label("Copy Path", systemImage: "doc.on.doc")
+                }
             }
 
-            Spacer()
-
-            // Per-item Reveal in Finder
-            Button(action: {
-                NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "")
-            }) {
-                Image(systemName: "folder")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if isExpanded {
+                SubtreeContent(isLoading: isLoading, children: children, depth: depth + 1)
             }
-            .buttonStyle(.plain)
-            .help("Reveal in Finder")
-
-            if let lastAccessed = item.lastAccessed {
-                Text(lastAccessed, style: .relative)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(item.formattedSize)
-                .font(.body.monospacedDigit().bold())
-                .foregroundStyle(item.sizeBytes > 1_000_000_000 ? .red : .primary)
         }
-        .padding(.vertical, 4)
-        .contextMenu {
-            Button(action: {
-                NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "")
-            }) {
-                Label("Reveal in Finder", systemImage: "folder")
+    }
+
+    private func toggleExpand() {
+        isExpanded.toggle()
+        guard isExpanded, children == nil, !isLoading else { return }
+        isLoading = true
+        Task { @MainActor in
+            let loaded = await SizeCalculator.childEntries(at: entry.path)
+            children = loaded
+            isLoading = false
+        }
+    }
+}
+
+// MARK: - Shared expansion helpers
+
+/// A chevron that toggles expansion; reserves its width even when the row
+/// cannot expand, so leaf and branch rows stay aligned.
+private struct DisclosureChevron: View {
+    let canExpand: Bool
+    let isExpanded: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Group {
+            if canExpand {
+                Button(action: action) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Color.clear
             }
-            Button(action: {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(item.path, forType: .string)
-            }) {
-                Label("Copy Path", systemImage: "doc.on.doc")
+        }
+        .frame(width: 12)
+    }
+}
+
+/// Renders the expanded body of a row: a spinner while loading, the child
+/// rows once loaded, or an "empty" note when a directory has no visible items.
+private struct SubtreeContent: View {
+    let isLoading: Bool
+    let children: [DirectoryEntry]?
+    let depth: Int
+
+    var body: some View {
+        if isLoading {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Calculating sizes...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 3)
+            .padding(.leading, CGFloat(depth) * 18 + 12)
+        } else if let children {
+            if children.isEmpty {
+                Text("Empty")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 3)
+                    .padding(.leading, CGFloat(depth) * 18 + 12)
+            } else {
+                ForEach(children) { child in
+                    DirectoryEntryRow(entry: child, depth: depth)
+                }
             }
         }
     }

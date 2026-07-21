@@ -64,6 +64,34 @@ final class SizeCalculatorTests: XCTestCase {
         }
     }
 
+    func testChildEntriesListsSortedBySize() async throws {
+        let tmpDir = NSTemporaryDirectory() + "maccleaner-children-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+
+        // Small file + a subdirectory holding a larger file.
+        try "small".write(toFile: tmpDir + "/small.txt", atomically: true, encoding: .utf8)
+        let subDir = tmpDir + "/big"
+        try FileManager.default.createDirectory(atPath: subDir, withIntermediateDirectories: true)
+        try String(repeating: "x", count: 100_000)
+            .write(toFile: subDir + "/large.txt", atomically: true, encoding: .utf8)
+
+        let entries = await SizeCalculator.childEntries(at: tmpDir)
+
+        XCTAssertEqual(entries.count, 2)
+        // Sorted largest first: the "big" directory outranks the small file.
+        XCTAssertEqual(entries.first?.name, "big")
+        XCTAssertTrue(entries.first?.isDirectory == true)
+        XCTAssertGreaterThan(entries[0].sizeBytes, entries[1].sizeBytes)
+    }
+
+    func testChildEntriesEmptyForFileOrMissingPath() async {
+        let missing = await SizeCalculator.childEntries(at: "/nonexistent/path")
+        XCTAssertTrue(missing.isEmpty)
+        XCTAssertFalse(SizeCalculator.isExpandableDirectory("/nonexistent/path"))
+        XCTAssertTrue(SizeCalculator.isExpandableDirectory(NSHomeDirectory()))
+    }
+
     func testLastAccessDate() {
         // Home directory should have an access date
         let date = SizeCalculator.lastAccessDate(at: NSHomeDirectory())
